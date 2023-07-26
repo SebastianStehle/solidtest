@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bootstrap demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/intro.js@7.0.1/minified/introjs.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="row pt-4 pb-4">
+            <div class="col text-center">
+                <h1>Hello, world!</h1>
+
+                <button class="btn btn-primary" id="button">
+                    Start Tour
+                </button>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-4">
+                <div class="card card1">
+                    <div class="card-body">
+                        <h4>Card 1</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="card card2">
+                    <div class="card-body">
+                        <h4 class="card2-header">Card 2</h4>
+
+                        <input class="form-control mb-2"></input>
+
+                        <button class="btn btn-secondary btn-block ">
+                            Card 2 Button
+                        </button>
+
+                        <button class="btn btn-danger btn-block mt-2">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="card card3">
+                    <div class="card-body">
+                        <h4>Card 3</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    ...
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.3/dist/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.1.3/dist/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/intro.js@7.0.1/intro.min.js"></script>
+
+    <script>
+        document.querySelector('.btn-secondary').addEventListener('click', async () => {
+            if (!document.querySelector('input').value) {
+                return;
+            }
+
+            await wait(2000);
+
+            $('#exampleModal').modal('show');
+        });
+
+        document.querySelector('.btn-danger').addEventListener('click', async () => {
+            document.querySelector('.card2').remove();
+        });
+
+        document.querySelector('.btn-primary').addEventListener('click', () => {
+            advanceTour({
+                exitOnOverlayClick: false,
+                steps: [{
+                    title: 'Welcome',
+                    intro: 'Hello World! 👋'
+                },
+                {
+                    element: '.card2',
+                    intro: 'Add a value to create something',
+                    /* hints: [{
+                        element: '.btn-secondary',
+                        hint: 'Text'
+                    }],*/
+                    continueWhen: '.form-control:has-text'
+                },
+                {
+                    element: '.btn-secondary',
+                    intro: 'Click Button to continue',
+                    hideNext: true,
+                    hidePrev: true
+                },
+                {
+                    element: '.modal-dialog',
+                    intro: 'You see a modal now',
+                    waitForElement: true,
+                    waitForAnimation: 0
+                },
+                {
+                    title: 'Farewell!',
+                    element: document.querySelector('.card__image'),
+                    intro: 'And this is our final step!'
+                }]
+            });
+        });
+
+        function advanceTour(options) {
+            const intro = introJs();
+
+            function clearAll() {
+                for (const step of options.steps) {
+                    if (step.monitor) {
+                        step.monitor();
+                    }
+
+                    if (step.listener) {
+                        step.listener();
+                    }
+                }
+            }
+
+            intro
+                .onexit(async () => {
+                    clearAll();
+                })
+                .onafterchange(async (element) => {
+                    clearAll();
+
+                    const stepIndex = intro._currentStep;
+
+                    if (stepIndex < 0) {
+                        return;
+                    }
+
+                    const step = options.steps[intro._currentStep];
+
+                    // Hint elements cannot be strings, therefore we fix that here.
+                    if (step.hints) {
+                        for (const hint of step.hints) {
+                            if (typeof hint.element === 'string') {
+                                hint.element = document.querySelector(hint.element);
+                            }
+                        }
+                    }
+
+                    const hidePrev = !!step.hidePrev;
+                    const hideNext = !!step.hideNext || !!step.continueWhen;
+
+                    // Intro js has no solid method to hide the buttons, therefore we use the display style.
+                    hideElement('.introjs-prevbutton', hidePrev);
+                    hideElement('.introjs-nextbutton', hideNext);
+                    hideElement('.introjs-tooltipbuttons', hidePrev && hideNext);
+
+                    // Do not use promises here, because we cannot really cancel them.
+                    step.monitor = monitorElement(step.element, () => {
+                        intro.exit();
+                    });
+
+                    // Do not use promises here, because we cannot really cancel them.
+                    step.listener = subscribeToConditions(step, options.steps[stepIndex + 1], () => {
+                        intro.nextStep();
+                    });
+                })
+                .setOptions(options)
+                .start();
+        }
+
+        const ConditionText = /^(?<selector>[^:]*):has-text(\((?<wait>[0-9]+)\))?/;
+        const ConditionVisible = /^(?<selector>[^:]*):visible?/;
+
+        function subscribeToConditions(step, nextStep, callback) {
+            if (step.continueWhen) {
+                const hasText = ConditionText.exec(step.continueWhen);
+                // For example input:has-text(2000)
+                if (hasText) {
+                    return waitForText(hasText.groups.selector, new Number(hasText.groups.wait), callback);
+                }
+
+                const visible = ConditionVisible.exec(step.continueWhen);
+                // For example modal:visible.
+                if (visible) {
+                    return waitForElement(visible.groups.selector, 0, callback);
+                }
+            }
+
+            if (nextStep && nextStep.waitForElement) {
+                return waitForElement(nextStep.element, nextStep.waitForAnimation, callback);
+            }
+        }
+
+        const transitionEvent = (whichTransitionEvent = () => {
+            const element = document.createElement("fake");
+
+            const transitions = {
+                "transition"      : "transitionend",
+                "OTransition"     : "oTransitionEnd",
+                "MozTransition"   : "transitionend",
+                "WebkitTransition": "webkitTransitionEnd"
+            }
+
+            for (const event in transitions){
+                if (element.style[event] !== undefined){
+                    element.remove();
+                    return transitions[event];
+                }
+            }
+        })();
+
+        function waitForText(selector, delay, callback) {
+            const element = document.querySelector(selector);
+
+            if (!element) {
+                resolve(false);
+                return;
+            }
+
+            if (element.value) {
+                resolve(true);
+                return;
+            }
+
+            let currentListener;
+            let currentTimer;
+
+            function cleanup() {
+                clearTimeout(currentTimer);
+                document.removeEventListener('input', currentListener);
+            }
+
+            currentListener = () => {
+                clearTimeout(currentTimer);
+
+                // Whenever the user enters some text, we wait a second until no input has been added anymore to show the next step.
+                if (event.target.value) {
+                    currentTimer = setTimeout(() => {
+                        cleanup();
+                        callback();
+                    }, delay || 1000);
+                }
+            }
+
+            element.addEventListener('input', currentListener);
+            
+            return () => {
+                cleanup();
+            };
+        }
+
+        function waitForElement(selector, delay, callback) {
+            let currentTimer;
+
+            function cleanup() {
+                clearInterval(currentTimer);
+            }
+
+            currentTimer = setInterval(() => {
+                const resolved = document.querySelector(selector);
+
+                if (resolved && isVisible(resolved)) {
+                    cleanup();
+
+                    const complete = () => {
+                        if (delay) {
+                            setTimeout(callback, delay);
+                        } else {
+                            callback();
+                        }
+                    };
+
+                    if (isAnimating(resolved)) {
+                        let subscription;
+                        subscription = resolved.addEventListener(transitionEvent, () => {
+                            complete();
+                            resolved.removeEventListener(transitionEvent, subscription);
+                        });
+                    } else {
+                        complete();
+                    }
+                }
+            }, 200);
+            
+            return () => {
+                cleanup();
+            };
+        }
+
+        function monitorElement(element, callback) {
+            if (!element) {
+                return;
+            }
+
+            if (typeof element === 'string') {
+                element = document.querySelector(element);
+            }
+
+            if (!element) {
+                return;
+            }
+
+            let running = true;
+
+            let timer = setInterval(() => {
+                if (!element.parentNode || !isVisible(element)) {
+                    callback();
+                    clearTimeout(timer);
+                }
+            }, 200);
+
+            return () => {
+                clearTimeout(timer);
+            };
+        }
+
+        function isVisible(element) {
+            const styles = window.getComputedStyle(element);
+
+            return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+        }
+
+        function isAnimating(element) {
+            const styles = window.getComputedStyle(element);
+
+            return element.animationName !== 'none';
+        }
+
+        function wait(timeout) {
+            return new Promise((resolve) => {
+                setInterval(resolve, timeout);
+            });
+        }
+
+        function hideElement(selector, hidden) {
+            const element = document.querySelector(selector);
+
+            if (element) {
+                element.style.display = hidden ? 'none' : 'block'
+            }
+        }
+    </script>
+</body>
+</html>

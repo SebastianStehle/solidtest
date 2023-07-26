@@ -79,6 +79,7 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.3/dist/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.1.3/dist/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/intro.js@7.0.1/intro.min.js"></script>
+    <script src="build/index.js"></script>
 
     <script>
         document.querySelector('.btn-secondary').addEventListener('click', async () => {
@@ -105,10 +106,10 @@
                 {
                     element: '.card2',
                     intro: 'Add a value to create something',
-                    /* hints: [{
-                        element: '.btn-secondary',
-                        hint: 'Text'
-                    }],*/
+                    hints: [{
+                        element: 'input',
+                        hint: 'Enter the text'
+                    }],
                     continueWhen: '.form-control:has-text'
                 },
                 {
@@ -125,244 +126,10 @@
                 },
                 {
                     title: 'Farewell!',
-                    element: document.querySelector('.card__image'),
                     intro: 'And this is our final step!'
                 }]
             });
         });
-
-        function advanceTour(options) {
-            const intro = introJs();
-
-            function clearAll() {
-                for (const step of options.steps) {
-                    if (step.monitor) {
-                        step.monitor();
-                    }
-
-                    if (step.listener) {
-                        step.listener();
-                    }
-                }
-            }
-
-            intro
-                .onexit(async () => {
-                    clearAll();
-                })
-                .onafterchange(async (element) => {
-                    clearAll();
-
-                    const stepIndex = intro._currentStep;
-
-                    if (stepIndex < 0) {
-                        return;
-                    }
-
-                    const step = options.steps[intro._currentStep];
-
-                    // Hint elements cannot be strings, therefore we fix that here.
-                    if (step.hints) {
-                        for (const hint of step.hints) {
-                            if (typeof hint.element === 'string') {
-                                hint.element = document.querySelector(hint.element);
-                            }
-                        }
-                    }
-
-                    const hidePrev = !!step.hidePrev;
-                    const hideNext = !!step.hideNext || !!step.continueWhen;
-
-                    // Intro js has no solid method to hide the buttons, therefore we use the display style.
-                    hideElement('.introjs-prevbutton', hidePrev);
-                    hideElement('.introjs-nextbutton', hideNext);
-                    hideElement('.introjs-tooltipbuttons', hidePrev && hideNext);
-
-                    // Do not use promises here, because we cannot really cancel them.
-                    step.monitor = monitorElement(step.element, () => {
-                        intro.exit();
-                    });
-
-                    // Do not use promises here, because we cannot really cancel them.
-                    step.listener = subscribeToConditions(step, options.steps[stepIndex + 1], () => {
-                        intro.nextStep();
-                    });
-                })
-                .setOptions(options)
-                .start();
-        }
-
-        const ConditionText = /^(?<selector>[^:]*):has-text(\((?<wait>[0-9]+)\))?/;
-        const ConditionVisible = /^(?<selector>[^:]*):visible?/;
-
-        function subscribeToConditions(step, nextStep, callback) {
-            if (step.continueWhen) {
-                const hasText = ConditionText.exec(step.continueWhen);
-                // For example input:has-text(2000)
-                if (hasText) {
-                    return waitForText(hasText.groups.selector, new Number(hasText.groups.wait), callback);
-                }
-
-                const visible = ConditionVisible.exec(step.continueWhen);
-                // For example modal:visible.
-                if (visible) {
-                    return waitForElement(visible.groups.selector, 0, callback);
-                }
-            }
-
-            if (nextStep && nextStep.waitForElement) {
-                return waitForElement(nextStep.element, nextStep.waitForAnimation, callback);
-            }
-        }
-
-        const transitionEvent = (whichTransitionEvent = () => {
-            const element = document.createElement("fake");
-
-            const transitions = {
-                "transition"      : "transitionend",
-                "OTransition"     : "oTransitionEnd",
-                "MozTransition"   : "transitionend",
-                "WebkitTransition": "webkitTransitionEnd"
-            }
-
-            for (const event in transitions){
-                if (element.style[event] !== undefined){
-                    element.remove();
-                    return transitions[event];
-                }
-            }
-        })();
-
-        function waitForText(selector, delay, callback) {
-            const element = document.querySelector(selector);
-
-            if (!element) {
-                resolve(false);
-                return;
-            }
-
-            if (element.value) {
-                resolve(true);
-                return;
-            }
-
-            let currentListener;
-            let currentTimer;
-
-            function cleanup() {
-                clearTimeout(currentTimer);
-                document.removeEventListener('input', currentListener);
-            }
-
-            currentListener = () => {
-                clearTimeout(currentTimer);
-
-                // Whenever the user enters some text, we wait a second until no input has been added anymore to show the next step.
-                if (event.target.value) {
-                    currentTimer = setTimeout(() => {
-                        cleanup();
-                        callback();
-                    }, delay || 1000);
-                }
-            }
-
-            element.addEventListener('input', currentListener);
-            
-            return () => {
-                cleanup();
-            };
-        }
-
-        function waitForElement(selector, delay, callback) {
-            let currentTimer;
-
-            function cleanup() {
-                clearInterval(currentTimer);
-            }
-
-            currentTimer = setInterval(() => {
-                const resolved = document.querySelector(selector);
-
-                if (resolved && isVisible(resolved)) {
-                    cleanup();
-
-                    const complete = () => {
-                        if (delay) {
-                            setTimeout(callback, delay);
-                        } else {
-                            callback();
-                        }
-                    };
-
-                    if (isAnimating(resolved)) {
-                        let subscription;
-                        subscription = resolved.addEventListener(transitionEvent, () => {
-                            complete();
-                            resolved.removeEventListener(transitionEvent, subscription);
-                        });
-                    } else {
-                        complete();
-                    }
-                }
-            }, 200);
-            
-            return () => {
-                cleanup();
-            };
-        }
-
-        function monitorElement(element, callback) {
-            if (!element) {
-                return;
-            }
-
-            if (typeof element === 'string') {
-                element = document.querySelector(element);
-            }
-
-            if (!element) {
-                return;
-            }
-
-            let running = true;
-
-            let timer = setInterval(() => {
-                if (!element.parentNode || !isVisible(element)) {
-                    callback();
-                    clearTimeout(timer);
-                }
-            }, 200);
-
-            return () => {
-                clearTimeout(timer);
-            };
-        }
-
-        function isVisible(element) {
-            const styles = window.getComputedStyle(element);
-
-            return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-        }
-
-        function isAnimating(element) {
-            const styles = window.getComputedStyle(element);
-
-            return element.animationName !== 'none';
-        }
-
-        function wait(timeout) {
-            return new Promise((resolve) => {
-                setInterval(resolve, timeout);
-            });
-        }
-
-        function hideElement(selector, hidden) {
-            const element = document.querySelector(selector);
-
-            if (element) {
-                element.style.display = hidden ? 'none' : 'block'
-            }
-        }
     </script>
 </body>
 </html>

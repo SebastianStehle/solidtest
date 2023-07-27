@@ -1,19 +1,38 @@
-declare var introJs: any;
+interface AdvancedStep extends introJs.Step {
+    // Indicates whether the next button should be hidden for this step.
+    hideNext: boolean;
+    
+    // Indicates whether the prev button should be hidden for this step.
+    hidePrev: boolean;
 
-function advanceTour(options: any) {
-    const intro = introJs();
+    // The hints to show for this step.
+    hints?: introJs.Hint[];
+
+    // Defines a condition.
+    condition?: string;
+}
+
+interface AdvancedOptions extends Omit<introJs.Options, 'steps'> {
+    // The steps with additional configuration.
+    steps: AdvancedStep[];
+}
+
+function advanceTour(options: AdvancedOptions) {
+    const intro = window['introJs']();
+
+    let listeners: ((() => void) | undefined)[] = [];
 
     function clearAll() {
-        for (const step of options.steps) {
-            if (step.monitor) {
-                step.monitor();
-            }
-
-            if (step.listener) {
-                step.listener();
+        for (const listener of listeners) {
+            if (listener) {
+                listener();
             }
         }
+        
+        listeners = [];
     }
+
+    const privateIntro: { _currentStep: number } = intro as any;
 
     intro
         .onexit(async () => {
@@ -22,23 +41,23 @@ function advanceTour(options: any) {
         .onafterchange(async () => {
             clearAll();
 
-            const stepIndex = intro._currentStep;
-            const stepConfig = options.steps[intro._currentStep];
+            const stepIndex = privateIntro._currentStep
+            const stepConfig = options.steps[stepIndex];
+
+            // The element has been resolved by intro.js at this point.
+            const element = resolveElement(stepConfig.element)!;
 
             // Hint elements cannot be strings, therefore we fix that here.
             if (stepConfig.hints) {
-                // All selectors are relative to the tour element, otherwise the would be outside of the focused area anyway.
-                const element = resolveElement(stepConfig.element);
-
                 for (const hint of stepConfig.hints) {
                     if (typeof hint.element === 'string') {
-                        hint.element = element.querySelector(hint.element);
+                        hint.element = element.querySelector(hint.element)!;
                     }
                 }
             }
 
             const hidePrev = !!stepConfig.hidePrev;
-            const hideNext = !!stepConfig.hideNext || !!stepConfig.continueWhen;
+            const hideNext = !!stepConfig.hideNext;
 
             // Intro js has no solid method to hide the buttons, therefore we use the display style.
             hideElement('.introjs-prevbutton', hidePrev);
@@ -46,14 +65,14 @@ function advanceTour(options: any) {
             hideElement('.introjs-tooltipbuttons', hidePrev && hideNext);
 
             // Monitor the element and exit the tour the element is not visible anymore.
-            stepConfig.monitor = monitorElement(stepConfig.element, () => {
+            listeners.push(monitorElement(element, () => {
                 intro.exit();
-            });
+            }));
 
             // Do not use promises here, because we cannot really cancel them.
-            stepConfig.listener = subscribeToConditions(stepConfig, options.steps[stepIndex + 1], () => {
+            listeners.push(subscribeToConditions(options.steps[stepIndex + 1], () => {
                 intro.nextStep();
-            });
+            }));
         })
         .setOptions(options)
         .start();
@@ -62,25 +81,23 @@ function advanceTour(options: any) {
 const ConditionText = /^(?<selector>[^:]*):has-text(\((?<wait>[0-9]+)\))?/;
 const ConditionVisible = /^(?<selector>[^:]*):visible?/;
 
-function subscribeToConditions(step: any, nextStep: any, callback: () => void) {
-    if (step.continueWhen) {
-        const hasText = ConditionText.exec(step.continueWhen);
-
-        // For example input:has-text(2000)
-        if (hasText?.groups) {
-            return waitForText(hasText.groups.selector, parseInt(hasText.groups.wait, 10), callback);
-        }
-
-        const visible = ConditionVisible.exec(step.continueWhen);
-
-        // For example modal:visible.
-        if (visible?.groups) {
-            return waitForElement(visible.groups.selector, 0, callback);
-        }
+function subscribeToConditions(nextStep: AdvancedStep, callback: () => void) {
+    if (!nextStep?.condition) {
+        return;
     }
 
-    if (nextStep && nextStep.waitForElement) {
-        return waitForElement(nextStep.element, nextStep.waitForAnimation, callback);
+    const hasText = ConditionText.exec(nextStep.condition);
+
+    // For example input:has-text(2000)
+    if (hasText?.groups) {
+        return waitForText(hasText.groups.selector, parseInt(hasText.groups.wait, 10), callback);
+    }
+
+    const visible = ConditionVisible.exec(nextStep.condition);
+
+    // For example modal:visible.
+    if (visible?.groups) {
+        return waitForElement(visible.groups.selector, 0, callback);
     }
 }
 
@@ -215,19 +232,21 @@ function isVisible(element: HTMLElement) {
 }
 
 function isAnimating(element: HTMLElement) {
-    return window.getComputedStyle(element).animationName !== 'none';
+    const style = window.getComputedStyle(element);
+    
+    return style.animationName !== 'none' || !!style.transition;
 }
 
 function hideElement(selector: string | HTMLElement, hidden: boolean) {    
-    resolveElement(selector).style.display = hidden ? 'none' : 'block'
+    resolveElement(selector)!.style.display = hidden ? 'none' : 'block'
 }
 
-function resolveElement<T extends HTMLElement>(selector: string | T): T {
+function resolveElement<T extends HTMLElement>(selector: string | T | Element | undefined): T | undefined {
     if (typeof selector === 'string') {
         return document.querySelector(selector) as T;
     } else {
-        return selector;
+        return selector as T;
     }
 }
 
-window['advanceTour'] = advanceTour;
+(window as any)['advanceTour'] = advanceTour;

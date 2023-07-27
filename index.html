@@ -110,19 +110,19 @@
                         element: 'input',
                         hint: 'Enter the text'
                     }],
-                    continueWhen: '.form-control:has-text'
+                    hideNext: true,
                 },
                 {
                     element: '.btn-secondary',
                     intro: 'Click Button to continue',
                     hideNext: true,
+                    condition: '.form-control:has-text',
                     hidePrev: true
                 },
                 {
+                    condition: '.modal-dialog:visible',
                     element: '.modal-dialog',
-                    intro: 'You see a modal now',
-                    waitForElement: true,
-                    waitForAnimation: 0
+                    intro: 'You see a modal now'
                 },
                 {
                     title: 'Farewell!',

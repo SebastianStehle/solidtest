@@ -10,7 +10,7 @@ function advanceTour(options: any) {
             }
 
             if (step.listener) {
-                step.condition();
+                step.listener();
             }
         }
     }

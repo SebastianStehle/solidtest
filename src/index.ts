@@ -78,8 +78,8 @@ function advanceTour(options: AdvancedOptions) {
         .start();
 }
 
-const ConditionText = /^(?<selector>[^:]*):has-text(\((?<wait>[0-9]+)\))?/;
-const ConditionVisible = /^(?<selector>[^:]*):visible?/;
+const ConditionText = /^(?<selector>[^:]*):has-text(\((?<wait>[0-9]+)\))?$/;
+const ConditionVisible = /^(?<selector>[^:]*):visible(\((?<wait>[0-9]+)\))?$/;
 
 function subscribeToConditions(nextStep: AdvancedStep, callback: () => void) {
     if (!nextStep?.condition) {
@@ -97,32 +97,9 @@ function subscribeToConditions(nextStep: AdvancedStep, callback: () => void) {
 
     // For example modal:visible.
     if (visible?.groups) {
-        return waitForElement(visible.groups.selector, 0, callback);
+        return waitForElement(visible.groups.selector, parseInt(visible.groups.wait, 10), callback);
     }
 }
-
-const transitionEvent: string = (() => {
-    const element = document.createElement('fake');
-
-    const transitions: Record<string, string> = {
-        'transition'      : 'transitionend',
-        'OTransition'     : 'oTransitionEnd',
-        'MozTransition'   : 'transitionend',
-        'WebkitTransition': 'webkitTransitionEnd'
-    }
-
-    let transitionName = 'transition';
-
-    for (const eventName of Object.keys(transitions)){
-        if (element.style[eventName as any] !== undefined) {
-            element.remove();
-            transitionName = transitions[eventName];
-        }
-    }
-
-    element.remove();
-    return transitionName;
-})();
 
 function waitForText(selector: string | HTMLInputElement, delay: number, callback: () => void) {
     const element = resolveElement<HTMLInputElement>(selector);
@@ -160,7 +137,7 @@ function waitForText(selector: string | HTMLInputElement, delay: number, callbac
 function waitForElement(selector: string | HTMLElement, delay: number, callback: () => void) {
     const resolved = resolveElement(selector);
 
-    const handleElement = (resolved: HTMLElement) => {
+    const handleElement = () => {
         const complete = () => {
             if (delay) {
                 setTimeout(callback, delay);
@@ -169,25 +146,12 @@ function waitForElement(selector: string | HTMLElement, delay: number, callback:
             }
         };
 
-        if (isAnimating(resolved)) {
-            let listener: () => void;
-
-            listener = () => {
-                resolved!.removeEventListener(transitionEvent, listener);
-                complete();
-            };
-
-            resolved.addEventListener(transitionEvent, listener);
-        } else {
-            complete();
-        }
-
+        complete();
         return;
-
     };
 
     if (resolved && isVisible(resolved)) {
-        handleElement(resolved);
+        handleElement();
         return;
     }
 
@@ -199,7 +163,8 @@ function waitForElement(selector: string | HTMLElement, delay: number, callback:
         const resolved = resolveElement(selector);
 
         if (resolved && isVisible(resolved)) {
-            handleElement(resolved);
+            cleanup();
+            handleElement();
         }
     }, 200);
     
@@ -228,13 +193,7 @@ function monitorElement(selector: string | HTMLElement, callback: () => void) {
 }
 
 function isVisible(element: HTMLElement) {
-    return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-}
-
-function isAnimating(element: HTMLElement) {
-    const style = window.getComputedStyle(element);
-    
-    return style.animationName !== 'none' || !!style.transition;
+    return element.offsetWidth > 0 || element.offsetHeight > 0 || element.getClientRects().length > 0;
 }
 
 function hideElement(selector: string | HTMLElement, hidden: boolean) {    
